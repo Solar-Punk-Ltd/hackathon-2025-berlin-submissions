@@ -7,18 +7,13 @@ import (
 	"log"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum" // Required for FilterQuery and Subscription
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethclient" // Required for ethclient.Client
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethersphere/bee/v2/pkg/sctx"
 	"github.com/ethersphere/bee/v2/pkg/transaction"
-)
-
-var (
-	ErrBagoy         = errors.New("")
-	bagoydescription = "bagoy"
 )
 
 type DataContractInterface interface {
@@ -31,9 +26,8 @@ type datacontract struct {
 	dataContractAddress common.Address
 	dataContractABI     abi.ABI
 	transactionService  transaction.Service
-	// ethClient field is not strictly needed here if passed directly to SubscribeDataSentToTarget
-	gasLimit         uint64
-	dataSentToTarget common.Hash // This is the event signature HASH for DataSentToTarget
+	gasLimit            uint64
+	dataSentToTarget    common.Hash
 }
 
 func NewDataContract(
@@ -41,7 +35,6 @@ func NewDataContract(
 	dataContractAddress common.Address,
 	dataContractABI abi.ABI,
 	transactionService transaction.Service,
-	// ethClient *ethclient.Client, // Not adding to struct for now, passed directly to subscribe method
 	setGasLimit bool,
 ) DataContractInterface {
 
@@ -75,8 +68,6 @@ func (c *datacontract) SendDataToTarget(ctx context.Context, target common.Addre
 	return receipt, nil
 }
 
-// rpcClient, err := rpc.DialContext(ctx, endpoint)
-// ethclient.NewClient(rpcClient)
 func (c *datacontract) SubscribeDataSentToTarget(ctx context.Context, client *ethclient.Client, sink chan<- types.Log) (ethereum.Subscription, error) {
 	if client == nil {
 		return nil, errors.New("ethclient.Client is nil")
@@ -109,30 +100,23 @@ func (c *datacontract) SubscribeDataSentToTarget(ctx context.Context, client *et
 		return nil, fmt.Errorf("failed to subscribe to DataSentToTarget events: %w", err)
 	}
 
-	// Start a goroutine to forward logs from the subscription channel to the sink channel
-	// This goroutine also handles unsubscription and error propagation
 	go func() {
-		defer close(sink) // Close the sink channel when the goroutine exits
+		defer close(sink)
 		for {
 			select {
-			case <-ctx.Done(): // If the context is cancelled, stop the goroutine
+			case <-ctx.Done():
 				fmt.Println("Subscription context cancelled, unsubscribing.")
 				sub.Unsubscribe()
 				return
-			case err := <-sub.Err(): // If the subscription encounters an error
-				// Log the error. Depending on the error, you might want to attempt to resubscribe
-				// or signal the calling code that the subscription has failed.
+			case err := <-sub.Err():
 				fmt.Printf("Event subscription error for DataSentToTarget: %v\\n", err)
-				// Forwarding the error or handling reconnection is an advanced topic.
-				// For now, we just stop this goroutine.
 				return
-			case vLog := <-logs: // Received a new log
-				// Send the raw log to the sink channel.
-				// The consumer of the sink channel will be responsible for unpacking the log
-				// using c.dataContractABI.UnpackIntoInterface or similar.
+			case vLog := <-logs:
 				select {
 				case sink <- vLog:
-				case <-ctx.Done(): // Check context again before sending to avoid blocking
+					fmt.Printf("Received DataSentToTarget TxHash: %s\\n", vLog.TxHash.Hex())
+					fmt.Printf("Received DataSentToTarget data: %s\\n", vLog.Data)
+				case <-ctx.Done():
 					fmt.Println("Subscription context cancelled while trying to send log, unsubscribing.")
 					sub.Unsubscribe()
 					return

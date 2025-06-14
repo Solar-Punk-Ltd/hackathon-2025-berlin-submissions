@@ -4,10 +4,12 @@ go 1.23.10
 
 require (
 	fyne.io/fyne/v2 v2.6.1
-	github.com/Solar-Punk-Ltd/bee-lite v0.0.7
+	github.com/Solar-Punk-Ltd/bee-lite v0.0.8
 	github.com/ethereum/go-ethereum v1.14.3
 	github.com/ethersphere/bee/v2 v2.5.0
 )
+
+replace github.com/ethersphere/bee/v2 => github.com/Solar-Punk-Ltd/bee/v2 v2.5.0-hack
 
 require (
 	contrib.go.opencensus.io/exporter/prometheus v0.4.2 // indirect

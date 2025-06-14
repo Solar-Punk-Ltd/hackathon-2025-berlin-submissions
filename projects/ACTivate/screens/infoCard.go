@@ -19,11 +19,10 @@ func (i *index) showInfoCard(ultraLightMode bool) *widget.Card {
 	walletDataButton := i.walletDataButton()
 	infoContent := container.NewVBox(addressContent)
 	if !ultraLightMode {
-		// batchRadio := i.batchRadio()
-		// stampsContent := i.stampsContent(batchRadio)
-		// buyBatchButton := i.buyBatchButton(batchRadio)
-		balanceContent := i.balanceContent()
-		infoContent = container.NewVBox(addressContent, balanceContent)
+		batchRadio := i.batchRadio()
+		stampsContent := i.stampsContent(batchRadio)
+		buyBatchButton := i.buyBatchButton(batchRadio)
+		infoContent = container.NewVBox(addressContent, stampsContent, buyBatchButton)
 	}
 	infoContent.Add(walletDataButton)
 
@@ -34,7 +33,7 @@ func (i *index) showInfoCard(ultraLightMode bool) *widget.Card {
 	go func() {
 		for {
 			time.Sleep(time.Second * 5)
-			if i.bl != nil {
+			if i.bl != nil && infoCard != nil && infoCard.Visible() {
 				infoCard.SetSubTitle(fmt.Sprintf("Connected with %d peers", i.bl.ConnectedPeerCount()))
 			}
 		}

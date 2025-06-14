@@ -47,6 +47,8 @@ const (
 	batchPrefKey           = "batch"
 	uploadsPrefKey         = "uploads"
 	overlayAddrPrefKey     = "overlayAddress"
+	eglrefPrefKey          = "eglref"
+	historyRefPrefKey      = "historyRef"
 )
 
 var (
@@ -240,16 +242,14 @@ func (i *index) loadMenuView() {
 	ultraLightMode := i.bl.BeeNodeMode() == api.UltraLightMode
 	infoCard := i.showInfoCard(ultraLightMode)
 
-	// Use a VBox for menuContent to stack items vertically
 	menuContent := container.NewVBox(infoCard)
 
-	granteeList := i.showListCard()
+	granteeList := i.showGranteeCard()
 	menuContent.Add(granteeList)
 
 	// downloadCard := i.showDownloadCard()
 	// menuContent.Add(downloadCard)
 
-	// Add the event message label to the view
 	if i.eventMessageLabel != nil {
 		menuContent.Add(i.eventMessageLabel)
 	} else {
