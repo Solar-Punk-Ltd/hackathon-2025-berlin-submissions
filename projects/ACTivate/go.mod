@@ -4,7 +4,8 @@ go 1.23.10
 
 require (
 	fyne.io/fyne/v2 v2.6.1
-	github.com/Solar-Punk-Ltd/bee-lite v0.0.8
+	github.com/Solar-Punk-Ltd/bee-lite v0.0.9
+	github.com/btcsuite/btcd/btcec/v2 v2.3.2
 	github.com/ethereum/go-ethereum v1.14.3
 	github.com/ethersphere/bee/v2 v2.5.0
 )
@@ -20,8 +21,7 @@ require (
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.10.0 // indirect
-	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
-	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.1 // indirect
+	github.com/btcsuite/btcd v0.22.0-beta // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/consensys/bavard v0.1.13 // indirect
 	github.com/consensys/gnark-crypto v0.12.1 // indirect

@@ -12,17 +12,19 @@ import (
 	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
+	"github.com/ethersphere/bee/v2/pkg/crypto"
 )
 
 func (i *index) showInfoCard(ultraLightMode bool) *widget.Card {
 	addressContent := i.addressContent()
+	pubkeyContent := i.pubkeyContent()
 	walletDataButton := i.walletDataButton()
 	infoContent := container.NewVBox(addressContent)
 	if !ultraLightMode {
 		batchRadio := i.batchRadio()
 		stampsContent := i.stampsContent(batchRadio)
 		buyBatchButton := i.buyBatchButton(batchRadio)
-		infoContent = container.NewVBox(addressContent, stampsContent, buyBatchButton)
+		infoContent = container.NewVBox(addressContent, pubkeyContent, stampsContent, buyBatchButton)
 	}
 	infoContent.Add(walletDataButton)
 
@@ -32,7 +34,7 @@ func (i *index) showInfoCard(ultraLightMode bool) *widget.Card {
 	// auto reload
 	go func() {
 		for {
-			time.Sleep(time.Second * 5)
+			time.Sleep(time.Second * 45)
 			if i.bl != nil && infoCard != nil && infoCard.Visible() {
 				infoCard.SetSubTitle(fmt.Sprintf("Connected with %d peers", i.bl.ConnectedPeerCount()))
 			}
@@ -66,6 +68,17 @@ func (i *index) addressContent() *fyne.Container {
 		addrCopyButton,
 	)
 	return container.NewVBox(addrHeader, addr)
+}
+
+func (i *index) pubkeyContent() *fyne.Container {
+	pubkey := hex.EncodeToString(crypto.EncodeSecp256k1PublicKey(i.bl.PublicKey()))
+	pubkeyCopyButton := i.copyButton(pubkey)
+	pubkeyHeader := container.NewHBox(widget.NewLabel("PublicKey:"))
+	pubkeyBox := container.NewHBox(
+		widget.NewLabel(pubkey),
+		pubkeyCopyButton,
+	)
+	return container.NewVBox(pubkeyHeader, pubkeyBox)
 }
 
 func (i *index) stampsContent(batchRadio *widget.RadioGroup) *fyne.Container {
