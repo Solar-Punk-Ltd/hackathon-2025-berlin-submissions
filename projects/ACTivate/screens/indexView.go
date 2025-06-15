@@ -2,6 +2,7 @@ package screens
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"log"
 
@@ -445,11 +446,11 @@ func (i *index) sendTransactionButton() *widget.Button {
 		targetEntry.SetText("0x1234567890123456789012345678901234567890")
 
 		ownerEntry := widget.NewEntry()
-		ownerEntry.SetPlaceHolder("Owner data")
-		ownerEntry.SetText("1234567890123456789012345678901234567890")
+		ownerEntry.SetPlaceHolder("Owner address (0x...)")
+		ownerEntry.SetText("0x1234567890123456789012345678901234567890")
 
 		actRefEntry := widget.NewEntry()
-		actRefEntry.SetPlaceHolder("ACT reference")
+		actRefEntry.SetPlaceHolder("ACT reference (hex string)")
 		actRefEntry.SetText("bd28e69a8cb4ff8fba0345d67501d770b5d842b68e28496eb728dac0501e6968")
 
 		topicEntry := widget.NewEntry()
@@ -499,13 +500,44 @@ func (i *index) sendTransactionButton() *widget.Button {
 				return
 			}
 
+			// Validate owner address
+			if !common.IsHexAddress(ownerEntry.Text) {
+				i.showError(fmt.Errorf("invalid owner address"))
+				return
+			}
+
+			// Validate ACT reference as hex string
+			actRefData := actRefEntry.Text
+			if len(actRefData) > 2 && actRefData[:2] == "0x" {
+				actRefData = actRefData[2:] // Remove 0x prefix if present
+			}
+			if len(actRefData)%2 != 0 {
+				i.showError(fmt.Errorf("ACT reference must be valid hex string (even number of characters)"))
+				return
+			}
+			// Validate hex format
+			if _, err := hex.DecodeString(actRefData); err != nil {
+				i.showError(fmt.Errorf("ACT reference must be valid hex string: %w", err))
+				return
+			}
+
 			// Show progress dialog
 			i.showProgressWithMessage("Processing and sending transaction...")
 
 			target := common.HexToAddress(targetEntry.Text)
-			ownerData := ownerEntry.Text
-			actRefData := actRefEntry.Text
+			ownerAddr := common.HexToAddress(ownerEntry.Text) // Owner as address
+			actRefData = actRefEntry.Text                     // ACT ref as hex string
 			topicData := topicEntry.Text
+
+			// Process ACT reference hex string
+			if len(actRefData) > 2 && actRefData[:2] == "0x" {
+				actRefData = actRefData[2:] // Remove 0x prefix if present
+			}
+			actRefBytes, err := hex.DecodeString(actRefData)
+			if err != nil {
+				i.showError(fmt.Errorf("failed to decode ACT reference hex: %w", err))
+				return
+			}
 
 			go func() {
 				defer i.hideProgress()
@@ -523,40 +555,39 @@ func (i *index) sendTransactionButton() *widget.Button {
 						return
 					}
 
-					// Encrypt owner data
-					encryptedOwner, err := encryptionUtils.EncryptString(ownerData, publicKey)
+					// Encrypt owner address bytes directly
+					encryptedOwnerBytes, err := encryptionUtils.EncryptData(ownerAddr.Bytes(), publicKey)
 					if err != nil {
-						i.showError(fmt.Errorf("failed to encrypt owner data: %w", err))
+						i.showError(fmt.Errorf("failed to encrypt owner address: %w", err))
 						return
 					}
 
-					// Encrypt ACT reference
-					encryptedActRef, err := encryptionUtils.EncryptString(actRefData, publicKey)
+					// Encrypt ACT reference bytes directly (same size output)
+					encryptedActRefBytes, err := encryptionUtils.EncryptData(actRefBytes, publicKey)
 					if err != nil {
 						i.showError(fmt.Errorf("failed to encrypt ACT reference: %w", err))
 						return
 					}
 
 					// Encrypt topic
-					encryptedTopic, err := encryptionUtils.EncryptString(topicData, publicKey)
+					encryptedTopicBytes, err := encryptionUtils.EncryptData([]byte(topicData), publicKey)
 					if err != nil {
 						i.showError(fmt.Errorf("failed to encrypt topic: %w", err))
 						return
 					}
 
-					// Use encrypted data
-					owner = []byte(encryptedOwner)
-					actRef = []byte(encryptedActRef)
-					topic = encryptedTopic
-					encryptionInfo = "Transaction data encrypted with deterministic ECDH + AES-CTR (same size)"
+					// Use encrypted data directly
+					owner = encryptedOwnerBytes
+					actRef = encryptedActRefBytes
+					topic = string(encryptedTopicBytes)
 
-					i.logger.Log("Transaction data encrypted successfully using deterministic ECDH + AES-CTR")
+					// Log the sizes for verification
+					i.logger.Log(fmt.Sprintf("Original actRef: %d bytes, Encrypted: %d bytes", len(actRefBytes), len(encryptedActRefBytes)))
 				} else {
-					// Use plain text data
-					owner = []byte(ownerData)
-					actRef = []byte(actRefData)
+					// Use plain data
+					owner = ownerAddr.Bytes() // Address as 20 bytes
+					actRef = actRefBytes      // Hex decoded bytes
 					topic = topicData
-					encryptionInfo = "Transaction data sent in plain text"
 
 					i.logger.Log("Transaction data sent without encryption")
 				}
