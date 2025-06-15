@@ -3,7 +3,8 @@
 - **Track(s):** Censorship Resistance, Applied Encryption
 - **Team/Contributors:** Bálint @bosi95, József @Kexort, András @aranyia; from @Solar-Punk-Ltd
 - **Repository:** https://github.com/Solar-Punk-Ltd/hackathon-2025-berlin-submissions
-- **Demo:** [Link to live demo, video, or screenshots]
+- **Demo:** 
+  - Presentation: https://github.com/Solar-Punk-Ltd/hackathon-2025-berlin-submissions/blob/main/projects/ACTivate/ACTivate_presentation.odp
 
 ## Description (TL;DR)
 
