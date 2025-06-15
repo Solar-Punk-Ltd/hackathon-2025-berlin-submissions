@@ -247,6 +247,10 @@ func (i *index) loadMenuView() {
 	granteeList := i.showGranteeCard()
 	menuContent.Add(granteeList)
 
+	// Add the send transaction button
+	sendTxButton := i.sendTransactionButton()
+	menuContent.Add(sendTxButton)
+
 	// downloadCard := i.showDownloadCard()
 	// menuContent.Add(downloadCard)
 
@@ -423,4 +427,160 @@ func (i *index) setupDataContractSubscription() {
 			}
 		}
 	}()
+}
+
+func (i *index) sendTransactionButton() *widget.Button {
+	button := widget.NewButton("Send Transaction", func() {
+		if i.contractSvc == nil {
+			i.showError(fmt.Errorf("contract service not initialized"))
+			return
+		}
+
+		// Initialize encryption utils
+		encryptionUtils := &EncryptionUtils{}
+
+		// Create input form for transaction parameters
+		targetEntry := widget.NewEntry()
+		targetEntry.SetPlaceHolder("Target address (0x...)")
+		targetEntry.SetText("0x1234567890123456789012345678901234567890")
+
+		ownerEntry := widget.NewEntry()
+		ownerEntry.SetPlaceHolder("Owner data")
+		ownerEntry.SetText("1234567890123456789012345678901234567890")
+
+		actRefEntry := widget.NewEntry()
+		actRefEntry.SetPlaceHolder("ACT reference")
+		actRefEntry.SetText("bd28e69a8cb4ff8fba0345d67501d770b5d842b68e28496eb728dac0501e6968")
+
+		topicEntry := widget.NewEntry()
+		topicEntry.SetPlaceHolder("Topic")
+		topicEntry.SetText("example-topic")
+
+		// Add public key input with default value
+		publicKeyEntry := widget.NewEntry()
+		publicKeyEntry.SetPlaceHolder("ECDSA Public Key (hex format)")
+		publicKeyEntry.SetText(encryptionUtils.GetDefaultPublicKey())
+
+		// Add button to generate new key pair
+		generateKeyButton := widget.NewButton("Generate New Key Pair", func() {
+			publicKeyHex, _, err := encryptionUtils.GenerateKeyPair()
+			if err != nil {
+				i.showError(fmt.Errorf("failed to generate key pair: %w", err))
+				return
+			}
+			publicKeyEntry.SetText(publicKeyHex)
+			dialog.ShowInformation("Key Generated", "New ECDSA key pair generated successfully!", i.Window)
+		})
+
+		// Create encryption checkbox
+		encryptDataCheck := widget.NewCheck("Encrypt transaction data", nil)
+		encryptDataCheck.SetChecked(true)
+
+		form := &widget.Form{
+			Items: []*widget.FormItem{
+				widget.NewFormItem("Target Address", targetEntry),
+				widget.NewFormItem("Owner Data", ownerEntry),
+				widget.NewFormItem("ACT Reference", actRefEntry),
+				widget.NewFormItem("Topic", topicEntry),
+				widget.NewFormItem("", encryptDataCheck),
+				widget.NewFormItem("Public Key", container.NewBorder(nil, generateKeyButton, nil, nil, publicKeyEntry)),
+			},
+		}
+
+		// Create custom dialog with form
+		d := dialog.NewCustomConfirm("Send Transaction", "Send", "Cancel", form, func(confirm bool) {
+			if !confirm {
+				return
+			}
+
+			// Validate target address
+			if !common.IsHexAddress(targetEntry.Text) {
+				i.showError(fmt.Errorf("invalid target address"))
+				return
+			}
+
+			// Show progress dialog
+			i.showProgressWithMessage("Processing and sending transaction...")
+
+			target := common.HexToAddress(targetEntry.Text)
+			ownerData := ownerEntry.Text
+			actRefData := actRefEntry.Text
+			topicData := topicEntry.Text
+
+			go func() {
+				defer i.hideProgress()
+
+				var owner, actRef []byte
+				var topic string
+				var encryptionInfo string
+
+				// Apply encryption if enabled
+				if encryptDataCheck.Checked {
+					// Parse public key from hex
+					publicKey, err := encryptionUtils.ParsePublicKeyFromHex(publicKeyEntry.Text)
+					if err != nil {
+						i.showError(fmt.Errorf("invalid public key: %w", err))
+						return
+					}
+
+					// Encrypt owner data
+					encryptedOwner, err := encryptionUtils.EncryptString(ownerData, publicKey)
+					if err != nil {
+						i.showError(fmt.Errorf("failed to encrypt owner data: %w", err))
+						return
+					}
+
+					// Encrypt ACT reference
+					encryptedActRef, err := encryptionUtils.EncryptString(actRefData, publicKey)
+					if err != nil {
+						i.showError(fmt.Errorf("failed to encrypt ACT reference: %w", err))
+						return
+					}
+
+					// Encrypt topic
+					encryptedTopic, err := encryptionUtils.EncryptString(topicData, publicKey)
+					if err != nil {
+						i.showError(fmt.Errorf("failed to encrypt topic: %w", err))
+						return
+					}
+
+					// Use encrypted data
+					owner = []byte(encryptedOwner)
+					actRef = []byte(encryptedActRef)
+					topic = encryptedTopic
+					encryptionInfo = "Transaction data encrypted with deterministic ECDH + AES-CTR (same size)"
+
+					i.logger.Log("Transaction data encrypted successfully using deterministic ECDH + AES-CTR")
+				} else {
+					// Use plain text data
+					owner = []byte(ownerData)
+					actRef = []byte(actRefData)
+					topic = topicData
+					encryptionInfo = "Transaction data sent in plain text"
+
+					i.logger.Log("Transaction data sent without encryption")
+				}
+
+				ctx := context.Background()
+				receipt, err := i.contractSvc.SendDataToTarget(ctx, target, owner, actRef, topic)
+				if err != nil {
+					i.showError(fmt.Errorf("failed to send transaction: %w", err))
+					return
+				}
+
+				// Show success message with transaction hash and encryption info
+				successMsg := fmt.Sprintf("Transaction sent successfully!\nTransaction Hash: %s\nBlock Number: %d\n\nEncryption: %s",
+					receipt.TxHash.Hex(), receipt.BlockNumber.Uint64(), encryptionInfo)
+
+				dialog.ShowInformation("Transaction Success", successMsg, i.Window)
+				i.logger.Log(fmt.Sprintf("Transaction successful: %s (%s)", receipt.TxHash.Hex(), encryptionInfo))
+			}()
+		}, i.Window)
+
+		d.Resize(fyne.NewSize(600, 400))
+		d.Show()
+	})
+
+	button.Importance = widget.HighImportance
+	return button
 }

@@ -55,7 +55,13 @@ func NewDataContract(
 
 func (c *datacontract) SendDataToTarget(ctx context.Context, target common.Address, owner, actRef []byte, topic string) (receipt *types.Receipt, err error) {
 
-	callData, err := c.dataContractABI.Pack("sendDataToTarget", target, owner, actRef, topic)
+	// Convert slices to fixed-size arrays as expected by the ABI
+	var ownerArray [32]byte
+	var actRefArray [32]byte
+	copy(ownerArray[:], owner)
+	copy(actRefArray[:], actRef)
+
+	callData, err := c.dataContractABI.Pack("sendDataToTarget", target, ownerArray, actRefArray, topic)
 	if err != nil {
 		return nil, err
 	}
