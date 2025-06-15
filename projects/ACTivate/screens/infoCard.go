@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
-	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -30,14 +29,14 @@ func (i *index) showInfoCard(ultraLightMode bool) *widget.Card {
 		fmt.Sprintf("Connected with %d peers", i.bl.ConnectedPeerCount()), infoContent)
 
 	// auto reload
-	go func() {
-		for {
-			time.Sleep(time.Second * 5)
-			if i.bl != nil && infoCard != nil && infoCard.Visible() {
-				infoCard.SetSubTitle(fmt.Sprintf("Connected with %d peers", i.bl.ConnectedPeerCount()))
-			}
-		}
-	}()
+	// go func() {
+	// 	for {
+	// 		time.Sleep(time.Second * 5)
+	// 		if i.bl != nil && infoCard != nil && infoCard.Visible() {
+	// 			infoCard.SetSubTitle(fmt.Sprintf("Connected with %d peers", i.bl.ConnectedPeerCount()))
+	// 		}
+	// 	}
+	// }()
 
 	return infoCard
 }

@@ -16,6 +16,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+
+	// "github.com/ethereum/go-ethereum/crypto" // Temporarily commented out
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethersphere/bee/v2/pkg/api"
 	"github.com/ethersphere/bee/v2/pkg/transaction" // For transaction.Service, though might be nil
@@ -252,8 +254,8 @@ func (i *index) loadMenuView() {
 	sendTxButton := i.sendTransactionButton()
 	menuContent.Add(sendTxButton)
 
-	// downloadCard := i.showDownloadCard()
-	// menuContent.Add(downloadCard)
+	downloadCard := i.showDownloadCard()
+	menuContent.Add(downloadCard)
 
 	if i.eventMessageLabel != nil {
 		menuContent.Add(i.eventMessageLabel)
@@ -380,21 +382,35 @@ func (i *index) setupDataContractSubscription() {
 					if err != nil {
 						i.logger.Log(fmt.Sprintf("Failed to unpack non-indexed data for event %s: %v", eventName, err))
 					} else {
+						// Debug: Log the unpacked data structure
+						i.logger.Log(fmt.Sprintf("Unpacked data count: %d", len(unpackedData)))
+						for idx, data := range unpackedData {
+							i.logger.Log(fmt.Sprintf("Unpacked data[%d]: %T = %v", idx, data, data))
+						}
+
+						// Debug: Log the argument names and types
+						for idx, arg := range nonIndexedArgs {
+							i.logger.Log(fmt.Sprintf("Arg[%d]: Name='%s', Type='%s'", idx, arg.Name, arg.Type.String()))
+						}
+
 						// Assign to variables based on the order of non-indexed args in ABI
-						// This needs to be robust and match your ABI definition precisely.
-						// Example: owner, actRef, topic
+						// The ABI shows: owner (bytes32), actref (bytes32), topic (string)
 						currentUnpackedIdx := 0
 						for _, arg := range nonIndexedArgs {
 							if currentUnpackedIdx >= len(unpackedData) {
 								break
 							}
-							switch arg.Name { // Or rely on order if names are not set/unique
+							switch arg.Name { // Match the actual ABI field names
 							case "owner":
-								if val, ok := unpackedData[currentUnpackedIdx].([]byte); ok {
+								if val, ok := unpackedData[currentUnpackedIdx].([32]byte); ok {
+									ownerBytes = val[:]
+								} else if val, ok := unpackedData[currentUnpackedIdx].([]byte); ok {
 									ownerBytes = val
 								}
-							case "actRef":
-								if val, ok := unpackedData[currentUnpackedIdx].([]byte); ok {
+							case "actref": // Note: ABI uses "actref" not "actRef"
+								if val, ok := unpackedData[currentUnpackedIdx].([32]byte); ok {
+									actRefBytes = val[:]
+								} else if val, ok := unpackedData[currentUnpackedIdx].([]byte); ok {
 									actRefBytes = val
 								}
 							case "topic":
@@ -425,6 +441,126 @@ func (i *index) setupDataContractSubscription() {
 				if i.eventMessageLabel != nil {
 					i.eventMessageLabel.SetText(parsedMsg)
 				}
+
+				// TODO: Temporarily commented out decryption - uncomment when needed
+				/*
+					// Decrypt the data before storing it using a placeholder private key
+					encryptionUtils := &EncryptionUtils{}
+
+					// Placeholder private key (hex encoded) - replace with actual private key in production
+					placeholderPrivateKeyHex := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+
+					// Parse the private key
+					privateKeyBytes, err := hex.DecodeString(placeholderPrivateKeyHex)
+					if err != nil {
+						i.logger.Log(fmt.Sprintf("Failed to decode placeholder private key: %v", err))
+					} else {
+						// Convert to ECDSA private key
+						privateKey, err := crypto.ToECDSA(privateKeyBytes)
+						if err != nil {
+							i.logger.Log(fmt.Sprintf("Failed to convert to ECDSA private key: %v", err))
+						} else {
+							// Print the corresponding public key
+							publicKeyBytes := crypto.FromECDSAPub(&privateKey.PublicKey)
+							publicKeyHex := hex.EncodeToString(publicKeyBytes)
+							i.logger.Log(fmt.Sprintf("Placeholder private key's public key: %s", publicKeyHex))
+
+							// Attempt to decrypt the data
+							var decryptedOwnerBytes []byte
+							var decryptedActRefBytes []byte
+							var decryptedTopicString string
+
+							// Decrypt owner bytes
+							if len(ownerBytes) > 0 {
+								decryptedOwner, err := encryptionUtils.DecryptData(ownerBytes, privateKey)
+								if err != nil {
+									i.logger.Log(fmt.Sprintf("Failed to decrypt owner data, using original: %v", err))
+									decryptedOwnerBytes = ownerBytes
+								} else {
+									decryptedOwnerBytes = decryptedOwner
+									i.logger.Log("Successfully decrypted owner data")
+								}
+							} else {
+								decryptedOwnerBytes = ownerBytes
+							}
+
+							// Decrypt actRef bytes
+							if len(actRefBytes) > 0 {
+								decryptedActRef, err := encryptionUtils.DecryptData(actRefBytes, privateKey)
+								if err != nil {
+									i.logger.Log(fmt.Sprintf("Failed to decrypt actRef data, using original: %v", err))
+									decryptedActRefBytes = actRefBytes
+								} else {
+									decryptedActRefBytes = decryptedActRef
+									i.logger.Log("Successfully decrypted actRef data")
+								}
+							} else {
+								decryptedActRefBytes = actRefBytes
+							}
+
+							// Decrypt topic string
+							if topicString != "" {
+								decryptedTopic, err := encryptionUtils.DecryptData([]byte(topicString), privateKey)
+								if err != nil {
+									i.logger.Log(fmt.Sprintf("Failed to decrypt topic data, using original: %v", err))
+									decryptedTopicString = topicString
+								} else {
+									decryptedTopicString = string(decryptedTopic)
+									i.logger.Log("Successfully decrypted topic data")
+								}
+							} else {
+								decryptedTopicString = topicString
+							}
+
+							// Use decrypted data for storage
+							ownerBytes = decryptedOwnerBytes
+							actRefBytes = decryptedActRefBytes
+							topicString = decryptedTopicString
+						}
+					}
+				*/
+
+				i.logger.Log("Using raw event data without decryption") // Parse the modified topic data (publicKey + 32-byte hex string)
+				if len(topicString) >= 194 {                            // 130 chars (public key) + 64 chars (32-byte hex) = 194 chars
+					// Extract the public key (first 130 characters if it starts with 04, otherwise first 128)
+					var extractedPublicKey string
+					var extracted32ByteHex string
+
+					if len(topicString) >= 130 && topicString[:2] == "04" {
+						// Uncompressed public key format (130 chars)
+						extractedPublicKey = topicString[:130]
+						if len(topicString) >= 194 {
+							extracted32ByteHex = topicString[130:194]
+						} else {
+							extracted32ByteHex = topicString[130:]
+						}
+					} else if len(topicString) >= 128 {
+						// Compressed public key or other format (128 chars)
+						extractedPublicKey = topicString[:128]
+						if len(topicString) >= 192 {
+							extracted32ByteHex = topicString[128:192]
+						} else {
+							extracted32ByteHex = topicString[128:]
+						}
+					}
+
+					i.logger.Log(fmt.Sprintf("Extracted from topic - PublicKey: %s", extractedPublicKey))
+					i.logger.Log(fmt.Sprintf("Extracted from topic - 32ByteHex: %s", extracted32ByteHex))
+
+					// Store both parts separately
+					i.setPreference("eventPublicKey", extractedPublicKey)
+					i.setPreference("event32ByteHex", extracted32ByteHex)
+				} else {
+					i.logger.Log(fmt.Sprintf("Topic string too short (%d chars) to contain publicKey + 32-byte hex", len(topicString)))
+				}
+
+				// use setPreference to store the owner, actRef, and topic
+				i.setPreference("eventOwner", hex.EncodeToString(ownerBytes))
+				i.setPreference("eventActRef", hex.EncodeToString(actRefBytes))
+				i.setPreference("eventTopic", topicString)
+				i.logger.Log("Stored owner, actRef, and topic in preferences.")
+				i.logger.Log("Event processing complete.")
+
 			}
 		}
 	}()
@@ -451,7 +587,7 @@ func (i *index) sendTransactionButton() *widget.Button {
 
 		actRefEntry := widget.NewEntry()
 		actRefEntry.SetPlaceHolder("ACT reference (hex string)")
-		actRefEntry.SetText("bd28e69a8cb4ff8fba0345d67501d770b5d842b68e28496eb728dac0501e6968")
+		actRefEntry.SetText("14b4fe81bf1445c429a236cf74aecaa6cc915f1f461e333d4c83091b114012e0")
 
 		topicEntry := widget.NewEntry()
 		topicEntry.SetPlaceHolder("Topic")
@@ -527,7 +663,7 @@ func (i *index) sendTransactionButton() *widget.Button {
 			target := common.HexToAddress(targetEntry.Text)
 			ownerAddr := common.HexToAddress(ownerEntry.Text) // Owner as address
 			actRefData = actRefEntry.Text                     // ACT ref as hex string
-			topicData := topicEntry.Text
+			// topicData := topicEntry.Text // Not used since we create custom topic data
 
 			// Process ACT reference hex string
 			if len(actRefData) > 2 && actRefData[:2] == "0x" {
@@ -546,51 +682,62 @@ func (i *index) sendTransactionButton() *widget.Button {
 				var topic string
 				var encryptionInfo string
 
-				// Apply encryption if enabled
-				if encryptDataCheck.Checked {
-					// Parse public key from hex
-					publicKey, err := encryptionUtils.ParsePublicKeyFromHex(publicKeyEntry.Text)
-					if err != nil {
-						i.showError(fmt.Errorf("invalid public key: %w", err))
-						return
-					}
+				// TODO: Temporarily commented out encryption - uncomment when needed
+				/*
+					// Apply encryption if enabled
+					if encryptDataCheck.Checked {
+						// Parse public key from hex
+						publicKey, err := encryptionUtils.ParsePublicKeyFromHex(publicKeyEntry.Text)
+						if err != nil {
+							i.showError(fmt.Errorf("invalid public key: %w", err))
+							return
+						}
 
-					// Encrypt owner address bytes directly
-					encryptedOwnerBytes, err := encryptionUtils.EncryptData(ownerAddr.Bytes(), publicKey)
-					if err != nil {
-						i.showError(fmt.Errorf("failed to encrypt owner address: %w", err))
-						return
-					}
+						// Encrypt owner address bytes directly
+						encryptedOwnerBytes, err := encryptionUtils.EncryptData(ownerAddr.Bytes(), publicKey)
+						if err != nil {
+							i.showError(fmt.Errorf("failed to encrypt owner address: %w", err))
+							return
+						}
 
-					// Encrypt ACT reference bytes directly (same size output)
-					encryptedActRefBytes, err := encryptionUtils.EncryptData(actRefBytes, publicKey)
-					if err != nil {
-						i.showError(fmt.Errorf("failed to encrypt ACT reference: %w", err))
-						return
-					}
+						// Encrypt ACT reference bytes directly (same size output)
+						encryptedActRefBytes, err := encryptionUtils.EncryptData(actRefBytes, publicKey)
+						if err != nil {
+							i.showError(fmt.Errorf("failed to encrypt ACT reference: %w", err))
+							return
+						}
 
-					// Encrypt topic
-					encryptedTopicBytes, err := encryptionUtils.EncryptData([]byte(topicData), publicKey)
-					if err != nil {
-						i.showError(fmt.Errorf("failed to encrypt topic: %w", err))
-						return
-					}
+						// Encrypt topic
+						encryptedTopicBytes, err := encryptionUtils.EncryptData([]byte(topicData), publicKey)
+						if err != nil {
+							i.showError(fmt.Errorf("failed to encrypt topic: %w", err))
+							return
+						}
 
-					// Use encrypted data directly
-					owner = encryptedOwnerBytes
-					actRef = encryptedActRefBytes
-					topic = string(encryptedTopicBytes)
+						// Use encrypted data directly
+						owner = encryptedOwnerBytes
+						actRef = encryptedActRefBytes
+						topic = string(encryptedTopicBytes)
 
-					// Log the sizes for verification
-					i.logger.Log(fmt.Sprintf("Original actRef: %d bytes, Encrypted: %d bytes", len(actRefBytes), len(encryptedActRefBytes)))
-				} else {
-					// Use plain data
-					owner = ownerAddr.Bytes() // Address as 20 bytes
-					actRef = actRefBytes      // Hex decoded bytes
-					topic = topicData
+						// Log the sizes for verification
+						i.logger.Log(fmt.Sprintf("Original actRef: %d bytes, Encrypted: %d bytes", len(actRefBytes), len(encryptedActRefBytes)))
+						encryptionInfo = "encrypted"
+					} else {
+				*/
+				// Use plain data
+				owner = ownerAddr.Bytes() // Address as 20 bytes
+				actRef = actRefBytes      // Hex decoded bytes
 
-					i.logger.Log("Transaction data sent without encryption")
-				}
+				// Create modified topic data: concatenate placeholder public key + 32-byte hex string
+				placeholderPublicKey := "04b753ee0222be7e1de96416b8074c095d9bda96f58cd3f942cd60911853533afa46964b640fa6a2480686656cfefca846a7facd7abbb33d437ef4384659273098"
+
+				// CHANGE BEFORE SENDING TRANSACTION
+				placeholder32ByteHex := "b12c1997de882193ff595660cd9bbb6d7908bae89634e390014b746ed3aac272"
+				topic = placeholderPublicKey + placeholder32ByteHex
+				i.logger.Log(fmt.Sprintf("Modified topic data: publicKey(%d chars) + 32byteHex(%d chars) = %d total chars", len(placeholderPublicKey), len(placeholder32ByteHex), len(topic)))
+
+				i.logger.Log("Transaction data sent without encryption")
+				// }
 
 				ctx := context.Background()
 				receipt, err := i.contractSvc.SendDataToTarget(ctx, target, owner, actRef, topic)
