@@ -3,8 +3,9 @@
 - **Track(s):** Censorship Resistance, Applied Encryption
 - **Team/Contributors:** Bálint @bosi95, József @Kexort, András @aranyia; from @Solar-Punk-Ltd
 - **Repository:** https://github.com/Solar-Punk-Ltd/hackathon-2025-berlin-submissions
-- **Demo:** 
+- **Demo:**
   - Video: https://drive.google.com/file/d/1E-PUW8DWE8SNXVsYKH35gpGmpWTZPabC/view?usp=sharing
+    - Swarm hash: 034ba4c46b8ecf0feb99ec51a8f723b95cc33e8243c0bd314e9732dda4a5ce48
   - Presentation: [ACTivate_presentation.odp](./ACTivate_presentation.odp)
 
 ## Description (TL;DR)
