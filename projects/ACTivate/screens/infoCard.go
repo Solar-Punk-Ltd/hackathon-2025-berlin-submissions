@@ -68,33 +68,6 @@ func (i *index) addressContent() *fyne.Container {
 	return container.NewVBox(addrHeader, addr)
 }
 
-func (i *index) balanceContent() *fyne.Container {
-	chequebookBalance, err := i.bl.ChequebookBalance()
-	if err != nil {
-		i.logger.Log(fmt.Sprintf("Cannot get chequebook balance: %s", err.Error()))
-		return container.NewHBox(widget.NewLabel("Cannot get chequebook balance"))
-	}
-
-	balanceContent := container.NewHBox(widget.NewLabel(
-		fmt.Sprintf("Chequebook balance: %s %s", chequebookBalance.String(), SwarmTokenSymbol)))
-
-	// auto reload
-	go func() {
-		for {
-			time.Sleep(time.Second * 60)
-			chequebookBalance, err := i.bl.ChequebookBalance()
-			if err != nil {
-				i.logger.Log(fmt.Sprintf("Cannot get chequebook balance: %s", err.Error()))
-			} else {
-				balanceContent = container.NewHBox(widget.NewLabel(
-					fmt.Sprintf("Chequebook balance: %s %s", chequebookBalance.String(), SwarmTokenSymbol)))
-			}
-		}
-	}()
-
-	return balanceContent
-}
-
 func (i *index) stampsContent(batchRadio *widget.RadioGroup) *fyne.Container {
 	stampsHeader := container.NewHBox(widget.NewLabel("Postage stamps:"))
 	stamps := i.bl.GetUsableBatches()
