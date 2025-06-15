@@ -4,6 +4,7 @@
 - **Team/Contributors:** Bálint @bosi95, József @Kexort, András @aranyia; from @Solar-Punk-Ltd
 - **Repository:** https://github.com/Solar-Punk-Ltd/hackathon-2025-berlin-submissions
 - **Demo:** 
+  - Video: https://drive.google.com/file/d/1E-PUW8DWE8SNXVsYKH35gpGmpWTZPabC/view?usp=sharing
   - Presentation: [ACTivate_presentation.odp](./ACTivate_presentation.odp)
 
 ## Description (TL;DR)
